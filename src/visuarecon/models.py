@@ -293,35 +293,48 @@ def _replace_last_conv(module: nn.Sequential, out_channels: int = 3) -> None:
     module[-1] = nn.Conv2d(last.in_channels, out_channels, kernel_size=last.kernel_size)
 
 
+def _load_torchvision_weights(model: nn.Module, weights_enum: object, label: str) -> None:
+    print(f"Loading official torchvision weights for {label}: {weights_enum}")
+    state_dict = weights_enum.get_state_dict(progress=True, check_hash=True)
+    msg = model.load_state_dict(state_dict, strict=True)
+    print(f"Official torchvision load_state_dict msg for {label}: {msg}")
+
+
 def build_model(name: str, weights: str, image_size: tuple[int, int]) -> nn.Module:
     if weights not in {"default", "none"}:
         raise ValueError("--weights must be 'default' or 'none'")
 
     if name == "fcn_resnet50":
         model = models.segmentation.fcn_resnet50(
-            weights=FCN_ResNet50_Weights.DEFAULT if weights == "default" else None,
+            weights=None,
             weights_backbone=None,
             aux_loss=True if weights == "default" else False,
         )
+        if weights == "default":
+            _load_torchvision_weights(model, FCN_ResNet50_Weights.DEFAULT, name)
         _replace_last_conv(model.classifier, 3)
         model.aux_classifier = None
         return SegmentationRestorationWrapper(model, normalize=weights == "default")
 
     if name == "deeplabv3_resnet50":
         model = models.segmentation.deeplabv3_resnet50(
-            weights=DeepLabV3_ResNet50_Weights.DEFAULT if weights == "default" else None,
+            weights=None,
             weights_backbone=None,
             aux_loss=True if weights == "default" else False,
         )
+        if weights == "default":
+            _load_torchvision_weights(model, DeepLabV3_ResNet50_Weights.DEFAULT, name)
         _replace_last_conv(model.classifier, 3)
         model.aux_classifier = None
         return SegmentationRestorationWrapper(model, normalize=weights == "default")
 
     if name == "lraspp_mobilenet_v3_large":
         model = models.segmentation.lraspp_mobilenet_v3_large(
-            weights=LRASPP_MobileNet_V3_Large_Weights.DEFAULT if weights == "default" else None,
+            weights=None,
             weights_backbone=None,
         )
+        if weights == "default":
+            _load_torchvision_weights(model, LRASPP_MobileNet_V3_Large_Weights.DEFAULT, name)
         model.classifier.low_classifier = nn.Conv2d(
             model.classifier.low_classifier.in_channels, 3, kernel_size=1
         )
