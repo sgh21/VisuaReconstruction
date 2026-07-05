@@ -61,6 +61,51 @@
 - 记录输入数量消融：1、2、4、8、all 张 suction 输入。
 - 最终应加入抓取任务相关指标或人工判读指标，避免只优化像素指标。
 
+## 2026-07-05 Clean-prior 实验记录
+
+- 代码状态：
+  - MAE 已改为与官方 MAE ViT-B/16 asymmetric encoder-decoder 对齐，使用 `timm` 的 `PatchEmbed`/`Block`，decoder 为 8 层、512 维、16 heads。
+  - MAE `weights=default` 加载官方 visualization checkpoint：`https://dl.fbaipublicfiles.com/mae/visualize/mae_visualize_vit_base.pth`。
+  - MAE 和 torchvision segmentation 模型均在加载官方权重时打印 `load_state_dict` 返回信息；当前已验证会打印 `<All keys matched successfully>`。
+  - MAE 内部使用 ImageNet mean/std normalize，输出再反归一化回 `[0,1]`，避免指标和 overlay 落在归一化空间。
+  - dataloader 已加入以图像中心为中心的 `1080x1080` 裁切，再 resize 到模型输入尺寸。
+  - 训练日志和曲线写入各 run 目录下的 `tensorboard/`。
+  - 数据与实验输出目录由 `.gitignore` 忽略；代码已推送到 `sgh21/VisuaReconstruction`，最近相关提交包括 `dca4421`, `10ce572`, `756a97e`, `6f9837a`, `ba807b1`。
+
+- MAE clean-prior：
+  - 命令参数：`model=mae_vit_b_16`, `weights=default`, `official-image-size`, `epoch=200`, `batch-size=48`, `num-workers=6`。
+  - run 目录：`runs/clean_prior/mae_vit_b_16_official_e200_bs48_norm`
+  - 官方权重加载日志：`Official MAE load_state_dict msg: <All keys matched successfully>`。
+  - 完整训练到 epoch 200；最终 `best val_psnr=17.40`。
+  - 测试结果：clean eval `mean_l1=0.12235`, `mean_psnr=17.45`。
+  - suction 可视化只导出了前 16 张样例：`runs/clean_prior/mae_vit_b_16_official_e200_bs48_norm/test_outputs_limit16`。
+  - 观察：MAE 作为 clean-prior 可运行，但 suction prior 图可见明显 patch/block artifacts，人工检查时需要重点看吸盘区域 overlay 是否可靠。
+
+- LRASPP clean-prior：
+  - 命令参数：`model=lraspp_mobilenet_v3_large`, `weights=default`, `official-image-size`, `batch-size=48`, `num-workers=6`。
+  - run 目录：`runs/clean_prior/lraspp_mobilenet_v3_large_official_e200_bs48`
+  - 官方权重加载日志：`Official torchvision load_state_dict msg for lraspp_mobilenet_v3_large: <All keys matched successfully>`。
+  - 训练未跑满 200 epoch；用户要求当前巡检结束后停止，约在 epoch 105/106 附近中断，最后明确记录的 `best val_psnr=29.39`。
+  - 完整测试已保存：`runs/clean_prior/lraspp_mobilenet_v3_large_official_e200_bs48/test_outputs_full`
+  - 测试结果：clean eval `mean_l1=0.06573`, `mean_psnr=22.09`。
+  - 输出包含全部 1885 张 suction 的 `_suction.png`, `_prior.png`, `_mask.png`, `_overlay.png`, `_grid.png` 和 CSV 指标。
+
+- FCN clean-prior：
+  - `fcn_resnet50` 使用官方 torchvision segmentation 权重，加载日志为 `Official torchvision load_state_dict msg for fcn_resnet50: <All keys matched successfully>`。
+  - `batch-size=48` 在 520x520 输入下 OOM，失败目录：`runs/clean_prior/fcn_resnet50_official_e200_bs48`。
+  - `batch-size=16` 可启动但显存仍接近满载，按用户要求停止，未作为主要测试结果。
+  - 当前采用 `batch-size=8`, `num-workers=6`, `official-image-size`。
+  - run 目录：`runs/clean_prior/fcn_resnet50_official_e200_bs8`
+  - 训练未跑满 200 epoch；按用户要求在一次巡检后停止，约 epoch 32 附近中断，最后明确记录的 `best val_psnr=34.13`。
+  - 完整测试已保存：`runs/clean_prior/fcn_resnet50_official_e200_bs8/test_outputs_full`
+  - 测试结果：clean eval `mean_l1=0.03002`, `mean_psnr=27.87`。
+  - 输出包含全部 1885 张 suction 的 `_suction.png`, `_prior.png`, `_mask.png`, `_overlay.png`, `_grid.png` 和 CSV 指标。
+
+- 当前阶段判断：
+  - 就 clean-prior 自监督重建的 clean eval 指标看，当前 FCN bs8 中断 checkpoint 明显优于 LRASPP 和 MAE。
+  - MAE 虽然官方结构和权重已对齐，但在本数据 clean-prior 输出中容易出现 patch 伪影；更适合继续作为自监督先验/初始化候选，而不是直接作为最优 clean-prior baseline。
+  - 后续若继续正式比较，应优先让 FCN bs8 跑满或设置统一 wall-clock/epoch budget，再对同一批 suction overlay 做人工伪影评价。
+
 ## 项目文档
 
 - 当前任务分析与探索计划：`docs/task_analysis_and_exploration_plan.md`
