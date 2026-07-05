@@ -30,7 +30,7 @@ $ModelConfigs = @{
     "fcn" = @{
         Model = "fcn_resnet50"
         Run = "fcn_resnet50_official"
-        BatchSize = 16
+        BatchSize = 8
         Degradation = "blur_noise_erase"
         EngineeringImageSize = @("512", "288")
     }
