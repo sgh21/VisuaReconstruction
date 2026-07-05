@@ -2,7 +2,7 @@ param(
     [ValidateSet("train", "test", "all")]
     [string]$Mode = "all",
 
-    [string[]]$Models = @("lraspp", "fcn", "mae"),
+    [string[]]$Models = @("mae", "lraspp", "fcn"),
 
     [string]$DataRoot = "dataset",
     [string]$CondaEnv = "VisionNet",
@@ -37,7 +37,7 @@ $ModelConfigs = @{
     "mae" = @{
         Model = "mae_vit_b_16"
         Run = "mae_vit_b_16_official"
-        BatchSize = 16
+        BatchSize = 48
         Degradation = "blur_noise_patchmask"
         EngineeringImageSize = @("224", "224")
     }
