@@ -58,10 +58,9 @@ def set_seed(seed: int) -> None:
 def effective_num_workers(num_workers: int) -> int:
     if os.name == "nt" and num_workers > 2:
         print(
-            f"Windows DataLoader workers are capped from {num_workers} to 2 "
-            "to avoid slow multiprocessing spawn/import failures."
+            f"Windows DataLoader is using {num_workers} workers. If worker startup is slow, "
+            "rerun with --num-workers 0 or 2."
         )
-        return 2
     return num_workers
 
 
@@ -85,8 +84,11 @@ def evaluate(model: torch.nn.Module, loader: DataLoader, device: torch.device, d
     with torch.no_grad():
         for batch in loader:
             clean = batch["image"].to(device, non_blocking=True)
-            degraded = degrade_batch(clean, mode=degradation)
-            pred = model(degraded)
+            if hasattr(model, "training_loss"):
+                pred = model(clean)
+            else:
+                degraded = degrade_batch(clean, mode=degradation)
+                pred = model(degraded)
             losses.append(l1_loss(pred, clean).item())
             psnrs.append(psnr(pred, clean))
     return {
@@ -139,9 +141,12 @@ def main() -> None:
         pbar = tqdm(train_loader, desc=f"epoch {epoch}/{args.epochs}", leave=False)
         for batch in pbar:
             clean = batch["image"].to(device, non_blocking=True)
-            degraded = degrade_batch(clean, mode=args.degradation)
-            pred = model(degraded)
-            loss = l1_loss(pred, clean) + 0.2 * mse_loss(pred, clean)
+            if hasattr(model, "training_loss"):
+                loss, pred = model.training_loss(clean)
+            else:
+                degraded = degrade_batch(clean, mode=args.degradation)
+                pred = model(degraded)
+                loss = l1_loss(pred, clean) + 0.2 * mse_loss(pred, clean)
 
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -161,8 +166,12 @@ def main() -> None:
 
         with torch.no_grad():
             sample = next(iter(val_loader))["image"].to(device)
-            degraded = degrade_batch(sample, mode=args.degradation)
-            pred = model(degraded)
+            if hasattr(model, "training_loss"):
+                degraded = sample
+                pred = model(sample)
+            else:
+                degraded = degrade_batch(sample, mode=args.degradation)
+                pred = model(degraded)
             writer.add_image("val/degraded_clean", make_grid(degraded[:4].cpu(), nrow=4), epoch)
             writer.add_image("val/pred", make_grid(pred[:4].cpu(), nrow=4), epoch)
             writer.add_image("val/target", make_grid(sample[:4].cpu(), nrow=4), epoch)

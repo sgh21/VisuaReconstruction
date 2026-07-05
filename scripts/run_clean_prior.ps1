@@ -7,7 +7,7 @@ param(
     [string]$DataRoot = "dataset",
     [string]$CondaEnv = "VisionNet",
     [int]$Epochs = 200,
-    [int]$NumWorkers = 2,
+    [int]$NumWorkers = 6,
     [double]$LearningRate = 1e-4,
     [int]$LimitSuction = 0,
     [double]$OverlayAlpha = 0.35,
@@ -23,21 +23,21 @@ $ModelConfigs = @{
     "lraspp" = @{
         Model = "lraspp_mobilenet_v3_large"
         Run = "lraspp_mobilenet_v3_large_official"
-        BatchSize = 4
+        BatchSize = 48
         Degradation = "blur_noise_erase"
         EngineeringImageSize = @("512", "288")
     }
     "fcn" = @{
         Model = "fcn_resnet50"
         Run = "fcn_resnet50_official"
-        BatchSize = 2
+        BatchSize = 48
         Degradation = "blur_noise_erase"
         EngineeringImageSize = @("512", "288")
     }
     "mae" = @{
         Model = "mae_vit_b_16"
         Run = "mae_vit_b_16_official"
-        BatchSize = 2
+        BatchSize = 16
         Degradation = "blur_noise_patchmask"
         EngineeringImageSize = @("224", "224")
     }
